@@ -88,8 +88,36 @@ void MatmulOperator::mat_mul_loop_unrolling(struct matmul_params *params) {
                     intermediate_sum3_2nd = 0;
                 for (int qj = 0; qj < 32; qj++) {
                     // TODO: decode a packed byte into two int8 in the range of (-8, 7)
+                    // Decode 4-bit packed values into two int8 values
+                    int8_t low_w0 = (w0_int4[qj] & 0x0F);  // Mask the lower 4 bits
+                    int8_t high_w0 = (w0_int4[qj] >> 4) & 0x0F;  // Shift and mask the upper 4 bits
+                    int8_t low_w1 = (w1_int4[qj] & 0x0F);
+                    int8_t high_w1 = (w1_int4[qj] >> 4) & 0x0F;
+                    int8_t low_w2 = (w2_int4[qj] & 0x0F);
+                    int8_t high_w2 = (w2_int4[qj] >> 4) & 0x0F;
+                    int8_t low_w3 = (w3_int4[qj] & 0x0F);
+                    int8_t high_w3 = (w3_int4[qj] >> 4) & 0x0F;
+
+                    // Sign extension to convert 4-bit values into 8-bit
+                    low_w0 = (low_w0 >= 8) ? (low_w0 - 16) : low_w0;
+                    high_w0 = (high_w0 >= 8) ? (high_w0 - 16) : high_w0;
+                    low_w1 = (low_w1 >= 8) ? (low_w1 - 16) : low_w1;
+                    high_w1 = (high_w1 >= 8) ? (high_w1 - 16) : high_w1;
+                    low_w2 = (low_w2 >= 8) ? (low_w2 - 16) : low_w2;
+                    high_w2 = (high_w2 >= 8) ? (high_w2 - 16) : high_w2;
+                    low_w3 = (low_w3 >= 8) ? (low_w3 - 16) : low_w3;
+                    high_w3 = (high_w3 >= 8) ? (high_w3 - 16) : high_w3;
 
                     // TODO: int8 multiply and accumulate operation
+                    // Multiply and accumulate for two blocks
+                    intermediate_sum0 += a_int8[qj] * low_w0;
+                    intermediate_sum1 += a_int8[qj] * low_w1;
+                    intermediate_sum2 += a_int8[qj] * low_w2;
+                    intermediate_sum3 += a_int8[qj] * low_w3;
+                    intermediate_sum0_2nd += a_int8[qj + block_size] * high_w0;
+                    intermediate_sum1_2nd += a_int8[qj + block_size] * high_w1;
+                    intermediate_sum2_2nd += a_int8[qj + block_size] * high_w2;
+                    intermediate_sum3_2nd += a_int8[qj + block_size] * high_w3;
                 }
                 // dequantize the sum into floating point
                 acc0 += (float)intermediate_sum0 * s_a * s_w0;
