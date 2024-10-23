@@ -126,6 +126,14 @@ static void *all_techniques_worker_func(void *args) {
                 __m256i raw_w = _mm256_loadu_si256(w_start);
                 __m256i raw_w_next = _mm256_loadu_si256(w_start + 1);
 
+                __m256i lowerHalf = _mm256_and_si256(raw_w, lowMask);  // Extract the lower half (low 4 bits)
+                __m256i upperHalfShifted = _mm256_srli_epi16(raw_w, 4);  // Shift right to move upper 4 bits to lower 4-bit position
+                __m256i upperHalf = _mm256_and_si256(upperHalfShifted, lowMask);  // Mask to get the upper 4 bits
+
+                __m256i lowerHalfnext = _mm256_and_si256(raw_w_next, lowMask);  // Extract the lower half (low 4 bits)
+                __m256i upperHalfShiftednext = _mm256_srli_epi16(raw_w_next, 4);  // Shift right to move upper 4 bits to lower 4-bit position
+                __m256i upperHalfnext = _mm256_and_si256(upperHalfShiftednext, lowMask);  // Mask to get the upper 4 bits
+
                 // TODO: apply zero_point to weights and convert the range from (0, 15) to (-8, 7)
                 // Hint: using `_mm256_sub_epi8` to the lower-half and upper-half vectors of weights
                 // Note: For the first two blocks, store the lower half and upper half of weights into `w_0` and
@@ -133,6 +141,11 @@ static void *all_techniques_worker_func(void *args) {
                 // `w_0_next` and `w_128_next`, respectively
                 const __m256i zero_point = _mm256_set1_epi8(8);
                 __m256i w_0, w_128, w_0_next, w_128_next;
+
+                w_0 = _mm256_sub_epi8(lowerHalf, zero_point);  // Convert to (-8, 7) range
+                w_128 = _mm256_sub_epi8(upperHalf, zero_point);  // Convert to (-8, 7) range
+                w_0_next = _mm256_sub_epi8(lowerHalfnext, zero_point);  // Convert to (-8, 7) range
+                w_128_next = _mm256_sub_epi8(upperHalfnext, zero_point);  // Convert to (-8, 7) range
 
                 // Perform int8 dot product with _mm256_maddubs_epi16
                 /* Syntax of _mm256_maddubs_epi16:
@@ -169,6 +182,10 @@ static void *all_techniques_worker_func(void *args) {
                 // dot2 = ax2 * sy2
                 // dot3 = ax_next * sy_next
                 // dot4 = ax2_next * sy2_next
+                dot = _mm256_maddubs_epi16(ax, sy);
+                dot2 = _mm256_maddubs_epi16(ax2, sy2);
+                dot3 = _mm256_maddubs_epi16(ax_next, sy_next);
+                dot4 = _mm256_maddubs_epi16(ax2_next, sy2_next);
 
                 // Convert int32 vectors to floating point vectors
                 const __m256i ones = _mm256_set1_epi16(1);
@@ -222,7 +239,17 @@ void MatmulOperator::mat_mul_all_techniques(struct matmul_params *params) {
     assert(params->block_size == 32);  // support block size 32 for now
 
     // TODO: Thread creation
-
+    int n = C->column;
+    int step = n / num_thread;
+    for (int i = 0; i < num_thread; i++) {
+            threads_args[i].start_j = i * step;
+            threads_args[i].end_j = (i == num_thread - 1) ? n : (i + 1) * step;
+            threads_args[i].params = params;
+            pthread_create(&thread_pool[i], NULL, all_techniques_worker_func, &threads_args[i]);
+        }
     // TODO: Join threads
+    for (int i = 0; i < num_thread; i++) {
+        pthread_join(thread_pool[i], NULL);
+    }
 };
 }  // namespace matmul

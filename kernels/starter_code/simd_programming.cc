@@ -118,12 +118,20 @@ void MatmulOperator::mat_mul_simd_programming(struct matmul_params *params) {
                 // (2) use `_mm256_and_si256` and lowMask to extract the lower half of wegihts
                 // (3) use `_mm256_srli_epi16` and `_mm256_and_si256` with lowMask to extract the upper half of weights
                 __m256i raw_w = _mm256_loadu_si256(w_start);
+                __m256i lowerHalf = _mm256_and_si256(raw_w, lowMask);  // Extract the lower half (low 4 bits)
+                __m256i upperHalfShifted = _mm256_srli_epi16(raw_w, 4);  // Shift right to move upper 4 bits to lower 4-bit position
+                __m256i upperHalf = _mm256_and_si256(upperHalfShifted, lowMask);  // Mask to get the upper 4 bits
 
                 // TODO: apply zero_point to weights and convert the range from (0, 15) to (-8, 7)
                 // Hint: using `_mm256_sub_epi8` to the lower-half and upper-half vectors of weights
                 // Note: Store the lower half and upper half of weights into `w_0` and `w_128`, respectively
                 const __m256i zero_point = _mm256_set1_epi8(8);
                 __m256i w_0, w_128;
+                __m256i lowerHalf_signed = _mm256_sub_epi8(lowerHalf, zero_point);  // Convert to (-8, 7) range
+                __m256i upperHalf_signed = _mm256_sub_epi8(upperHalf, zero_point);  // Convert to (-8, 7) range
+
+                w_0 = lowerHalf_signed;  
+                w_128 = upperHalf_signed;
 
                 // Perform int8 dot product with _mm256_maddubs_epi16
                 /* Syntax of _mm256_maddubs_epi16:
@@ -152,6 +160,8 @@ void MatmulOperator::mat_mul_simd_programming(struct matmul_params *params) {
                 // Hint: use `_mm256_maddubs_epi16` to complete the following computation
                 // dot = ax * sy
                 // dot2 = ax2 * sy2
+                dot = _mm256_maddubs_epi16(ax, sy);
+                dot2 = _mm256_maddubs_epi16(ax2, sy2);
 
                 // Convert int32 vectors to floating point vectors
                 const __m256i ones = _mm256_set1_epi16(1);
