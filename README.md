@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Tutorial for TinyChat: Optimizing LLM on Edge Devices
 
 This is a lab for [efficientml.ai course](https://efficientml.ai/).
@@ -42,3 +43,7 @@ Please check this document and follow the instructions which will walk you throu
 [llama.cpp](https://github.com/ggerganov/llama.cpp)
 
 [transformers](https://github.com/huggingface/transformers)
+=======
+# TinyChatEngine
+This lab 5 from MIT6.5940 taught by Pro Han. 
+>>>>>>> 2c7d9397d00a4961101f6d789f71862929773bbf
