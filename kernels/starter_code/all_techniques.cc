@@ -233,7 +233,7 @@ void MatmulOperator::mat_mul_all_techniques(struct matmul_params *params) {
 
     quantize_fp32_to_int8(A->data_ptr, A->int8_data_ptr, params->A_scales, A->row * A->column, block_size);
 
-    const int num_thread = 8;
+    const int num_thread = 64;
     pthread_t thread_pool[num_thread];
     struct w4a8_thread_args threads_args[num_thread];
     assert(params->block_size == 32);  // support block size 32 for now
